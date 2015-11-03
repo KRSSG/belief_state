@@ -20,6 +20,7 @@ void Callback(const krssg_ssl_msgs::SSL_DetectionFrame::ConstPtr& vmsg) {
   msg.frame_number = vmsg->frame_number;
   msg.t_capture = vmsg->t_capture;
   msg.t_sent = vmsg->t_sent;
+  msg.isteamyellow = is_team_yellow;
   if (vmsg->balls.size() > 0) {
     msg.ballDetected = true;
     msg.ballPos.x = vmsg->balls[0].x;

@@ -2,29 +2,41 @@
 #include <krssg_ssl_msgs/BeliefState.h>
 #include <krssg_ssl_msgs/SSL_DetectionFrame.h>
 #include <geometry_msgs/Pose2D.h>
+#include <geometry_msgs/Point32.h>
 #include <string.h>
 #include <math.h>
 #include <vector>
-
+#include <queue>
 using namespace std;
 
 bool is_team_yellow;
 ros::Subscriber vision_sub;
 ros::Publisher pub;
+queue<pair<geometry_msgs::Pose2D, ros::Time> > velQ;
 
+const int Q_SIZE = 3; 
 void Callback(const krssg_ssl_msgs::SSL_DetectionFrame::ConstPtr& vmsg) {
   printf("got a vmsg!\n");
   using namespace krssg_ssl_msgs;
   using geometry_msgs::Pose2D;
+  using geometry_msgs::Point32;
   krssg_ssl_msgs::BeliefState msg;
   msg.frame_number = vmsg->frame_number;
   msg.t_capture = vmsg->t_capture;
   msg.t_sent = vmsg->t_sent;
   msg.isteamyellow = is_team_yellow;
   if (vmsg->balls.size() > 0) {
+    assert(velQ.size() != 0);
+    Pose2D oldPos = velQ.front().first;
+    ros::Time oldTime = velQ.front().second;
+    velQ.pop();
+    ros::Time curTime = ros::Time::now();
     msg.ballDetected = true;
     msg.ballPos.x = vmsg->balls[0].x;
     msg.ballPos.y = vmsg->balls[0].y;
+    msg.ballVel.x = (msg.ballPos.x - oldPos.x)/(curTime-oldTime).toSec();
+    msg.ballVel.y = (msg.ballPos.y - oldPos.y)/(curTime-oldTime).toSec();
+    velQ.push(make_pair(msg.ballPos, curTime));
   } else {
     msg.ballDetected = 0;
   }
@@ -70,7 +82,10 @@ int main(int argc, char **argv)
     is_team_yellow = atof(argv[1]);
   }
   ros::NodeHandle n;
-
+  for (int i = 0; i < Q_SIZE; ++i)
+  {
+    velQ.push(make_pair(geometry_msgs::Pose2D(), ros::Time::now()));
+  }
   vision_sub = n.subscribe("/vision", 1000, Callback);
   pub = n.advertise<krssg_ssl_msgs::BeliefState>("/belief_state", 1000);
   ros::spin();
